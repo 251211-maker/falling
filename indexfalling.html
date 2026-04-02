@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>무한 낙하 게임</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(to bottom, #fff0f6, #ffe4ec);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #5b4b5a;
+            font-family: "Arial", sans-serif;
+            overflow: hidden;
+        }
+
+        #guide {
+            margin-bottom: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #7a5c70;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px 16px;
+            border-radius: 999px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        #game-container {
+            position: relative;
+            border: 5px solid #ffc2d1;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+            background: white;
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #bde8ff, #e8f9ff 70%, #fff6fb);
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #7a4c64;
+            background: rgba(255, 255, 255, 0.75);
+            padding: 8px 14px;
+            border-radius: 999px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.92);
+            padding: 24px 28px;
+            text-align: center;
+            border-radius: 20px;
+            border: 3px solid #ffb3c7;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+            color: #6d4b5f;
+            min-width: 220px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: linear-gradient(to bottom, #ff9fbc, #ff7fa3);
+            border: none;
+            color: white;
+            border-radius: 999px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(255, 127, 163, 0.35);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="guide">방향키(←, →)를 사용하여 구름을 밟아 주세요!</div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">Score: <span id="score">0</span></div>
+        <div id="game-over" class="hidden">
+            <h1>Game Over!</h1>
+            <p id="final-score" style="font-size: 20px;">0</p>
+            <button id="restartBtn">다시 시작</button>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreElement = document.getElementById('score');
+            const gameOverScreen = document.getElementById('game-over');
+            const finalScoreElement = document.getElementById('final-score');
+            const restartBtn = document.getElementById('restartBtn');
+
+            canvas.width = 400;
+            canvas.height = 600;
+
+            let score, gameActive, player, platforms, keys, gameSpeed;
+            const gravity = 0.5;
+            const moveSpeed = 6;
+
+            function init() {
+                score = 0;
+                gameSpeed = 2.5;
+                gameActive = true;
+                keys = {};
+
+                player = {
+                    x: 185,
+                    y: 200,
+                    width: 34,
+                    height: 34,
+                    dy: 0
+                };
+
+                platforms = [];
+                platforms.push({ x: 150, y: 400 });
+                for (let i = 0; i < 7; i++) {
+                    platforms.push({
+                        x: Math.random() * (canvas.width - 90),
+                        y: (600 / 8) * i + 50
+                    });
+                }
+
+                scoreElement.innerText = score;
+                gameOverScreen.classList.add('hidden');
+                animate();
+            }
+
+            window.addEventListener('keydown', e => keys[e.code] = true);
+            window.addEventListener('keyup', e => keys[e.code] = false);
+            restartBtn.addEventListener('click', init);
+
+            function update() {
+                if (!gameActive) return;
+
+                player.dy += gravity;
+                player.y += player.dy;
+
+                if (keys['ArrowLeft'] && player.x > 0) player.x -= moveSpeed;
+                if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += moveSpeed;
+
+                platforms.forEach(plat => {
+                    plat.y -= gameSpeed;
+
+                    if (
+                        player.dy > 0 &&
+                        player.x < plat.x + 90 &&
+                        player.x + player.width > plat.x &&
+                        player.y + player.height > plat.y &&
+                        player.y + player.height < plat.y + 15 + player.dy
+                    ) {
+                        player.y = plat.y - player.height;
+                        player.dy = 0;
+                    }
+
+                    if (plat.y < -20) {
+                        plat.y = canvas.height;
+                        plat.x = Math.random() * (canvas.width - 90);
+                        score++;
+                        scoreElement.innerText = score;
+                        if (score % 5 === 0) gameSpeed += 0.1;
+                    }
+                });
+
+                if (player.y < 0 || player.y > canvas.height) {
+                    gameActive = false;
+                    finalScoreElement.innerText = "최종 점수: " + score;
+                    gameOverScreen.classList.remove('hidden');
+                }
+            }
+
+            function drawBackgroundDecor() {
+                // 작은 구름들
+                drawMiniCloud(40, 70, 0.8);
+                drawMiniCloud(300, 110, 1);
+                drawMiniCloud(120, 180, 0.7);
+                drawMiniCloud(330, 240, 0.9);
+
+                // 별사탕 느낌 장식
+                for (let i = 0; i < 8; i++) {
+                    const x = 30 + i * 45;
+                    const y = 40 + (i % 2) * 20;
+                    drawSparkle(x, y, 6);
+                }
+            }
+
+            function drawMiniCloud(x, y, scale = 1) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(scale, scale);
+
+                ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                ctx.arc(16, -6, 14, 0, Math.PI * 2);
+                ctx.arc(34, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            function drawSparkle(x, y, size) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.moveTo(-size, 0);
+                ctx.lineTo(size, 0);
+                ctx.moveTo(0, -size);
+                ctx.lineTo(0, size);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            function drawPlatform(x, y) {
+                ctx.save();
+                ctx.translate(x, y);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(18, 10, 12, 0, Math.PI * 2);
+                ctx.arc(36, 6, 15, 0, Math.PI * 2);
+                ctx.arc(56, 10, 13, 0, Math.PI * 2);
+                ctx.arc(72, 9, 11, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'rgba(255, 220, 235, 0.9)';
+                ctx.fillRect(10, 13, 66, 5);
+
+                ctx.restore();
+            }
+
+            function drawPlayer(x, y, w, h) {
+                const cx = x + w / 2;
+                const cy = y + h / 2;
+
+                // 몸통
+                ctx.fillStyle = '#ffd6e7';
+                ctx.beginPath();
+                ctx.arc(cx, cy, w / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 귀
+                ctx.fillStyle = '#ffd6e7';
+                ctx.beginPath();
+                ctx.ellipse(x + 9, y + 6, 5, 10, -0.3, 0, Math.PI * 2);
+                ctx.ellipse(x + w - 9, y + 6, 5, 10, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 귀 안쪽
+                ctx.fillStyle = '#ffb3c7';
+                ctx.beginPath();
+                ctx.ellipse(x + 9, y + 7, 2.5, 6, -0.3, 0, Math.PI * 2);
+                ctx.ellipse(x + w - 9, y + 7, 2.5, 6, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 눈
+                ctx.fillStyle = '#3d2b36';
+                ctx.beginPath();
+                ctx.arc(x + w * 0.35, y + h * 0.52, 2.5, 0, Math.PI * 2);
+                ctx.arc(x + w * 0.65, y + h * 0.52, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 볼
+                ctx.fillStyle = '#ff9db7';
+                ctx.beginPath();
+                ctx.arc(x + w * 0.24, y + h * 0.66, 4, 0, Math.PI * 2);
+                ctx.arc(x + w * 0.76, y + h * 0.66, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 입
+                ctx.strokeStyle = '#7a4c64';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(cx, y + h * 0.63, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+                ctx.stroke();
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                drawBackgroundDecor();
+
+                platforms.forEach(plat => {
+                    drawPlatform(plat.x, plat.y);
+                });
+
+                drawPlayer(player.x, player.y, player.width, player.height);
+            }
+
+            function animate() {
+                if (!gameActive) return;
+                update();
+                draw();
+                requestAnimationFrame(animate);
+            }
+
+            init();
+        };
+    </script>
+</body>
+</html>
